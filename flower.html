@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#120a26">
+<title>Bloom</title>
+<meta name="description" content="A little flower, just for you.">
+<meta property="og:title" content="Bloom">
+<meta property="og:description" content="A little flower, just for you.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%B8%3C/text%3E%3C/svg%3E">
+
+<style>
+  :root {
+    --vh: 1vh;
+    --ink: #ffe6f2;
+    --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @supports (height: 1dvh) { :root { --vh: 1dvh; } }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #0b0716; }
+  body {
+    color: var(--ink);
+    font-family: var(--sans);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---------- backdrop ---------- */
+  .bg {
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(90% 60% at 50% 38%, rgba(120, 40, 120, .45) 0%, rgba(120, 40, 120, 0) 70%),
+      linear-gradient(180deg, #100824 0%, #1c0f3b 42%, #2b1042 68%, #0a0616 100%);
+  }
+  #dust { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* ---------- layout ---------- */
+  main {
+    position: relative; z-index: 1;
+    min-height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: .35rem;
+    padding: max(14px, env(safe-area-inset-top)) 16px max(18px, env(safe-area-inset-bottom));
+  }
+  .scene {
+    position: relative;
+    width: min(100%, calc(var(--vh) * 42.67), 430px);
+    aspect-ratio: 2 / 3;
+  }
+  .aura {
+    position: absolute; left: 50%; top: 35.8%;
+    width: 120%; aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255, 110, 185, .38) 0%, rgba(190, 80, 200, .16) 35%, rgba(190, 80, 200, 0) 65%);
+    opacity: 0;
+    transition: opacity 3.2s ease;
+    pointer-events: none;
+  }
+  .go .aura { opacity: .3; }
+  .bloom .aura { opacity: 1; }
+  .done .aura { animation: pulse 5s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
+
+  svg#flower {
+    position: relative; display: block; width: 100%; height: 100%;
+    overflow: visible;
+    touch-action: manipulation;
+    -webkit-user-select: none; user-select: none;
+  }
+
+  /* ---------- plant ---------- */
+  #plant { transform-origin: 200px 590px; }
+  .go #plant { animation: sway 7s ease-in-out 2.4s infinite; }
+  @keyframes sway {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(1.1deg); }
+    75% { transform: rotate(-1.1deg); }
+  }
+
+  #stem { stroke-dashoffset: var(--off, 420); transition: stroke-dashoffset 1.7s cubic-bezier(.4, .1, .2, 1); }
+  .go #stem { stroke-dashoffset: 0; }
+
+  .leaf {
+    transform-origin: 0 0;
+    transform: scale(0) rotate(-18deg);
+    transition: transform 1.3s cubic-bezier(.3, 1.3, .5, 1) var(--ld, 900ms);
+  }
+  .go .leaf { transform: scale(1) rotate(0deg); }
+  .leaf-vein { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.2; stroke-linecap: round; }
+
+  .head-in {
+    transform-origin: 0 0;
+    transform: scale(0);
+    transition: transform 1.2s cubic-bezier(.3, 1.35, .5, 1) 1.3s;
+  }
+  .go .head-in { transform: scale(1); }
+
+  .sepal {
+    transform-origin: 0 0;
+    transform: rotate(var(--ba)) scale(1);
+    transition: transform 1.9s cubic-bezier(.3, .9, .3, 1) 0s;
+  }
+  .bloom .sepal { transform: rotate(var(--fa)) scale(.92); }
+
+  .petal {
+    transform-origin: 0 0;
+    transform: rotate(var(--ba)) scale(var(--bs));
+    transition: transform 1.5s cubic-bezier(.3, 1.25, .45, 1) var(--d, 0ms);
+    cursor: pointer;
+    outline: none;
+  }
+  .bloom .petal { transform: rotate(var(--fa)) scale(1); }
+  .pb { transform-origin: 0 0; }
+  .shape { stroke: rgba(255, 232, 244, .38); stroke-width: .8; }
+  .petal:focus-visible .shape { stroke: #fff; stroke-width: 2.5; }
+  .vein { fill: none; stroke: rgba(255, 255, 255, .2); stroke-width: 1.1; stroke-linecap: round; pointer-events: none; }
+  .halo { fill: #ffd9ec; fill-opacity: .6; opacity: 0; pointer-events: none; }
+
+  .center {
+    transform-origin: 0 0;
+    transform: scale(0);
+    transition: transform 1s cubic-bezier(.3, 1.5, .5, 1) var(--cd, 2000ms);
+    pointer-events: none;
+  }
+  .bloom .center { transform: scale(1); }
+
+  #fx, #fx * { pointer-events: none; }
+  #fx path { transform-origin: 0 0; }
+
+  /* ---------- text ---------- */
+  .caption {
+    display: flex; flex-direction: column; align-items: center;
+    gap: .8rem; text-align: center; max-width: 30rem;
+  }
+  .message {
+    margin: 0;
+    font-family: var(--serif);
+    font-style: italic; font-weight: 400;
+    font-size: clamp(1.35rem, 5.6vw, 1.95rem);
+    line-height: 1.25;
+    text-wrap: balance;
+    color: var(--ink);
+    text-shadow: 0 0 22px rgba(255, 120, 190, .55);
+    opacity: 0; filter: blur(8px); transform: translateY(8px);
+    transition: opacity 1.6s ease, filter 1.6s ease, transform 1.6s ease;
+  }
+  .done .message { opacity: 1; filter: none; transform: none; }
+
+  .hint {
+    margin: 0;
+    font-size: .92rem; line-height: 1.3;
+    color: rgba(255, 220, 238, .66);
+    opacity: 0;
+    transition: opacity 1s ease 1.2s;
+  }
+  .done .hint { opacity: 1; }
+  .touched .hint { opacity: 0; transition-delay: 0s; }
+
+  .replay {
+    appearance: none; -webkit-appearance: none;
+    display: inline-flex; align-items: center; gap: .5rem;
+    min-height: 46px; padding: .7rem 1.4rem;
+    font: 500 1rem/1 var(--sans);
+    color: #ffd9ec;
+    background: rgba(255, 255, 255, .07);
+    border: 1px solid rgba(255, 190, 225, .45);
+    border-radius: 999px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    visibility: hidden; opacity: 0;
+    transition: opacity 1s ease 1.4s, visibility 0s linear 1.4s, background .2s ease, transform .15s ease;
+  }
+  .done .replay { visibility: visible; opacity: 1; }
+  .replay:hover { background: rgba(255, 255, 255, .14); }
+  .replay:active { transform: scale(.97); }
+  .replay:focus-visible { outline: 2px solid #ffd0e8; outline-offset: 3px; }
+  .replay svg { width: 18px; height: 18px; }
+
+  /* resets the scene instantly when replaying */
+  .reset, .reset * { transition: none !important; animation: none !important; }
+
+  @media (max-height: 520px) and (orientation: landscape) {
+    main { flex-direction: row; gap: clamp(1rem, 5vw, 3rem); }
+    .scene { width: min(46vw, calc(var(--vh) * 56), 430px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .message { filter: none; transform: none; }
+  }
+</style>
+</head>
+
+<body>
+<div class="bg" aria-hidden="true"></div>
+<canvas id="dust" aria-hidden="true"></canvas>
+
+<main id="stage">
+  <div class="scene" id="scene">
+    <div class="aura" aria-hidden="true"></div>
+
+    <svg id="flower" viewBox="0 0 400 600" role="group" aria-label="A pink flower blooming on a green stem" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="gStem" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#1d6b49" stop-opacity="0"/>
+          <stop offset=".14" stop-color="#1d6b49" stop-opacity=".75"/>
+          <stop offset=".55" stop-color="#2f9a63"/>
+          <stop offset="1" stop-color="#5ad08c"/>
+        </linearGradient>
+        <linearGradient id="gLeaf" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#1f7a52"/>
+          <stop offset="1" stop-color="#62d08f"/>
+        </linearGradient>
+        <linearGradient id="gSepal" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#1b6a47"/>
+          <stop offset="1" stop-color="#4fbf80"/>
+        </linearGradient>
+        <linearGradient id="gOuter" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#b3205f"/>
+          <stop offset=".45" stop-color="#ee5a97"/>
+          <stop offset="1" stop-color="#ffbad8"/>
+        </linearGradient>
+        <linearGradient id="gMid" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#cc2f74"/>
+          <stop offset=".5" stop-color="#f77fb0"/>
+          <stop offset="1" stop-color="#ffd0e6"/>
+        </linearGradient>
+        <linearGradient id="gInner" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#e0508b"/>
+          <stop offset=".5" stop-color="#ff9ec7"/>
+          <stop offset="1" stop-color="#ffe4f0"/>
+        </linearGradient>
+        <radialGradient id="gCenter" cx=".4" cy=".35" r=".8">
+          <stop offset="0" stop-color="#fff3b8"/>
+          <stop offset="1" stop-color="#f2a93b"/>
+        </radialGradient>
+        <radialGradient id="gGlow">
+          <stop offset="0" stop-color="#ffe9a0" stop-opacity=".6"/>
+          <stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="7" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <g id="plant">
+        <path id="stem" d="M200,590 C188,520 214,470 203,410 C194,355 208,300 200,215"
+              fill="none" stroke="url(#gStem)" stroke-width="7" stroke-linecap="round"/>
+
+        <g transform="translate(205,454) rotate(-20)">
+          <g class="leaf" style="--ld:900ms">
+            <path d="M0,0 C16,-30 62,-44 104,-24 C78,8 30,18 0,0Z" fill="url(#gLeaf)"/>
+            <path class="leaf-vein" d="M4,-1 C34,-12 64,-16 96,-22"/>
+          </g>
+        </g>
+        <g transform="translate(200,360) scale(-1,1) rotate(-14)">
+          <g class="leaf" style="--ld:1150ms">
+            <path d="M0,0 C14,-26 54,-38 90,-20 C68,7 26,15 0,0Z" fill="url(#gLeaf)"/>
+            <path class="leaf-vein" d="M4,-1 C30,-10 56,-14 83,-19"/>
+          </g>
+        </g>
+
+        <g id="head" transform="translate(200,215)">
+          <g class="head-in">
+            <g id="sepals"></g>
+            <g id="petals"></g>
+            <g id="center" class="center"></g>
+          </g>
+          <g id="fx"></g>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <div class="caption">
+    <p class="message" id="message" aria-live="polite">A little flower, just for you.</p>
+    <p class="hint">Tap a petal.</p>
+    <button class="replay" id="replay" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Replay
+    </button>
+  </div>
+</main>
+
+<script>
+/* =====================================================================
+   BLOOM  -  easy-to-edit settings live in CONFIG
+   (the message text itself is in the <p id="message"> element above)
+   ===================================================================== */
+const CONFIG = {
+  bloomDelay: 2700,      // ms before the bud starts opening
+  stagger: 140,          // ms between each petal starting to open
+  petalDuration: 1500,   // ms each petal takes to open (keep in sync with .petal transition in CSS)
+  maxParticles: 80,      // cap on live sparkles/hearts
+  // Petal rings, back to front. n = petals, len/wid = size,
+  // offset = starting angle, budTilt/budScale = how closed the bud looks.
+  rings: [
+    { n: 8, len: 132, wid: 44, offset: 22.5, budTilt: .09, budScale: .80, fill: 'url(#gOuter)' },
+    { n: 6, len: 106, wid: 38, offset: 30,   budTilt: .07, budScale: .66, fill: 'url(#gMid)'   },
+    { n: 5, len: 78,  wid: 30, offset: 0,    budTilt: .05, budScale: .50, fill: 'url(#gInner)' }
+  ],
+  heartColors: ['#ff8fc0', '#ffb3d4', '#ff5fa2', '#ffffff'],
+  sparkColors: ['#fff6c9', '#ffffff', '#ffd6ec', '#ffe28a']
+};
+
+(function () {
+  'use strict';
+
+  var NS = 'http://www.w3.org/2000/svg';
+  var $ = function (s) { return document.querySelector(s); };
+  var stage = $('#stage'), scene = $('#scene'), svg = $('#flower');
+  var sepalLayer = $('#sepals'), petalLayer = $('#petals'), centerLayer = $('#center');
+  var fx = $('#fx'), stem = $('#stem'), replayBtn = $('#replay');
+
+  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  function reduceMotion() { return mq.matches; }
+
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function norm(a) { a = ((a % 360) + 360) % 360; return a > 180 ? a - 360 : a; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function petalPath(L, W) {
+    return 'M0,0 C' + (-W) + ',' + (-L * .3) + ' ' + (-W * 1.12) + ',' + (-L * .86) + ' 0,' + (-L) +
+           ' C' + (W * 1.12) + ',' + (-L * .86) + ' ' + W + ',' + (-L * .3) + ' 0,0Z';
+  }
+
+  /* ---------- build the flower ---------- */
+  // stem draw-on length
+  var stemLen = stem.getTotalLength ? stem.getTotalLength() : 420;
+  stem.style.strokeDasharray = stemLen + ' ' + (stemLen * 2);
+  stem.style.setProperty('--off', (stemLen * 1.05).toFixed(1));
+
+  // sepals (green cup behind the bud that folds down on bloom)
+  var sepalBud = [-30, -15, 0, 15, 30];
+  var sepalEnd = [-130, -155, 180, 155, 130];
+  sepalBud.forEach(function (ba, i) {
+    var g = el('g', { 'class': 'sepal' }, sepalLayer);
+    g.style.setProperty('--ba', ba + 'deg');
+    g.style.setProperty('--fa', sepalEnd[i] + 'deg');
+    el('path', { d: 'M0,0 C-15,-18 -14,-52 0,-74 C14,-52 15,-18 0,0Z', fill: 'url(#gSepal)', stroke: 'rgba(255,255,255,.12)', 'stroke-width': '.8' }, g);
+  });
+
+  // petals
+  var petals = [];
+  var idx = 0;
+  CONFIG.rings.forEach(function (r) {
+    for (var i = 0; i < r.n; i++) {
+      var fa = norm(r.offset + i * 360 / r.n);
+      var ba = fa * r.budTilt;
+      var g = el('g', { 'class': 'petal', role: 'button', tabindex: '-1', 'aria-label': 'Petal ' + (idx + 1) }, petalLayer);
+      g.style.setProperty('--fa', fa.toFixed(2) + 'deg');
+      g.style.setProperty('--ba', ba.toFixed(2) + 'deg');
+      g.style.setProperty('--bs', r.budScale);
+      g.style.setProperty('--d', (idx * CONFIG.stagger) + 'ms');
+      var d = petalPath(r.len, r.wid);
+      var pb = el('g', { 'class': 'pb' }, g);
+      el('path', { 'class': 'shape', d: d, fill: r.fill }, pb);
+      el('path', { 'class': 'vein', d: 'M0,' + (-r.len * .1) + ' Q' + (r.wid * .08) + ',' + (-r.len * .45) + ' 0,' + (-r.len * .78) }, pb);
+      el('path', { 'class': 'halo', d: d, filter: 'url(#glow)' }, pb);
+      var rad = fa * Math.PI / 180;
+      g.dataset.tx = (Math.sin(rad) * r.len * .8).toFixed(1);
+      g.dataset.ty = (-Math.cos(rad) * r.len * .8).toFixed(1);
+      petals.push(g);
+      idx++;
+    }
+  });
+
+  // flower centre
+  centerLayer.style.setProperty('--cd', Math.round(idx * CONFIG.stagger * .7) + 'ms');
+  el('circle', { r: 36, fill: 'url(#gGlow)' }, centerLayer);
+  el('circle', { r: 15, fill: 'url(#gCenter)' }, centerLayer);
+  var k;
+  for (k = 0; k < 14; k++) {
+    var a = k * 2 * Math.PI / 14;
+    el('circle', { cx: (Math.cos(a) * 23).toFixed(1), cy: (Math.sin(a) * 23).toFixed(1), r: 2.3, fill: '#ffe08a' }, centerLayer);
+  }
+  for (k = 0; k < 8; k++) {
+    var b = k * 2 * Math.PI / 8 + .4;
+    el('circle', { cx: (Math.cos(b) * 8.5).toFixed(1), cy: (Math.sin(b) * 8.5).toFixed(1), r: 1.5, fill: '#c97a1a', 'fill-opacity': '.65' }, centerLayer);
+  }
+
+  /* ---------- sparkles & hearts ---------- */
+  var HEART = 'M0,7 C-11,-1 -8,-10 0,-4.5 C8,-10 11,-1 0,7Z';
+  var SPARK = 'M0,-7 L1.9,-1.9 L7,0 L1.9,1.9 L0,7 L-1.9,1.9 L-7,0 L-1.9,-1.9Z';
+  var live = 0;
+
+  function burst(x, y, n, spread, scatter) {
+    var calm = reduceMotion();
+    for (var i = 0; i < n && live < CONFIG.maxParticles; i++) {
+      var heart = Math.random() < .4;
+      var sx = x + (Math.random() - .5) * scatter * 2;
+      var sy = y + (Math.random() - .5) * scatter * 2;
+      var g = el('g', { transform: 'translate(' + sx.toFixed(1) + ',' + sy.toFixed(1) + ')' }, fx);
+      var p = el('path', { d: heart ? HEART : SPARK, fill: pick(heart ? CONFIG.heartColors : CONFIG.sparkColors) }, g);
+      live++;
+      var s = .55 + Math.random() * .8;
+      var dx = calm ? 0 : (Math.random() - .5) * spread * 2;
+      var dy = calm ? 0 : -(25 + Math.random() * spread);
+      var rot = calm ? 0 : (Math.random() - .5) * 120;
+      var anim = p.animate([
+        { transform: 'translate(0px,0px) scale(0.2) rotate(0deg)', opacity: 0 },
+        { transform: 'translate(' + dx * .35 + 'px,' + dy * .35 + 'px) scale(' + s + ') rotate(' + rot * .35 + 'deg)', opacity: 1, offset: .2 },
+        { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + s * .6 + ') rotate(' + rot + 'deg)', opacity: 0 }
+      ], {
+        duration: calm ? 900 : 1100 + Math.random() * 900,
+        easing: 'cubic-bezier(.2,.7,.35,1)',
+        delay: Math.random() * 120,
+        fill: 'both'
+      });
+      (function (gg) {
+        anim.onfinish = function () { if (gg.parentNode) gg.parentNode.removeChild(gg); live--; };
+      })(g);
+    }
+  }
+
+  /* ---------- touching petals ---------- */
+  function touchPetal(p) {
+    stage.classList.add('touched');
+    var pb = p.querySelector('.pb');
+    var halo = p.querySelector('.halo');
+    halo.animate([{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: 0 }], { duration: 1300, easing: 'ease-out' });
+    if (!reduceMotion()) {
+      pb.animate([
+        { transform: 'scale(1) rotate(0deg)' },
+        { transform: 'scale(1.16) rotate(-3deg)', offset: .3 },
+        { transform: 'scale(.96) rotate(1.5deg)', offset: .6 },
+        { transform: 'scale(1) rotate(0deg)' }
+      ], { duration: 700, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+    }
+    burst(parseFloat(p.dataset.tx), parseFloat(p.dataset.ty), 7, 70, 6);
+  }
+
+  svg.addEventListener('pointerdown', function (e) {
+    if (!stage.classList.contains('done')) return;
+    var p = e.target.closest ? e.target.closest('.petal') : null;
+    if (p) touchPetal(p);
+  });
+  svg.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if ((e.key === 'Enter' || e.key === ' ') && t.classList && t.classList.contains('petal')) {
+      e.preventDefault();
+      touchPetal(t);
+    }
+  });
+
+  /* ---------- the sequence ---------- */
+  var timers = [];
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function setInteractive(on) {
+    petals.forEach(function (p) { p.setAttribute('tabindex', on ? '0' : '-1'); });
+  }
+
+  function play() {
+    timers.forEach(clearTimeout);
+    timers = [];
+    while (fx.firstChild) fx.removeChild(fx.firstChild);
+    live = 0;
+
+    stage.classList.add('reset');
+    stage.classList.remove('go', 'bloom', 'done', 'touched');
+    setInteractive(false);
+    void stage.offsetWidth; // flush styles while transitions are off
+    stage.classList.remove('reset');
+
+    if (reduceMotion()) {
+      // no movement: show the finished flower with a gentle fade
+      stage.classList.add('go', 'bloom', 'done');
+      setInteractive(true);
+      scene.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, easing: 'ease-out' });
+      return;
+    }
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { stage.classList.add('go'); });
+    });
+    later(function () { stage.classList.add('bloom'); }, CONFIG.bloomDelay);
+    var total = CONFIG.bloomDelay + (petals.length - 1) * CONFIG.stagger + CONFIG.petalDuration;
+    later(function () {
+      stage.classList.add('done');
+      setInteractive(true);
+      burst(0, -12, 18, 130, 60); // one celebratory shower
+    }, total);
+  }
+
+  replayBtn.addEventListener('click', play);
+  play();
+})();
+
+/* =====================================================================
+   Ambient glowing dust (canvas)
+   ===================================================================== */
+(function () {
+  'use strict';
+  var cv = document.getElementById('dust');
+  var ctx = cv.getContext('2d');
+  var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var W = 0, H = 0, parts = [], raf = 0, last = 0, resizeTimer = 0;
+
+  var sprites = ['255,150,205', '200,160,255', '255,225,170'].map(function (rgb) {
+    var c = document.createElement('canvas');
+    c.width = c.height = 64;
+    var g = c.getContext('2d');
+    var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(' + rgb + ',1)');
+    gr.addColorStop(.25, 'rgba(' + rgb + ',.55)');
+    gr.addColorStop(1, 'rgba(' + rgb + ',0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    return c;
+  });
+
+  function make(initial) {
+    return {
+      x: Math.random() * W,
+      y: initial ? Math.random() * H : H + 30,
+      s: 8 + Math.random() * 20,
+      vy: 6 + Math.random() * 16,
+      drift: 8 + Math.random() * 14,
+      ph: Math.random() * 6.283,
+      sp: .6 + Math.random() * 1.4,
+      k: Math.floor(Math.random() * sprites.length),
+      a: .25 + Math.random() * .5
+    };
+  }
+
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n = Math.round(Math.min(70, Math.max(24, W * H / 16000)));
+    parts = [];
+    for (var i = 0; i < n; i++) parts.push(make(true));
+    draw(performance.now());
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, W, H);
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      ctx.globalAlpha = p.a * (.55 + .45 * Math.sin(t / 1000 * p.sp + p.ph));
+      ctx.drawImage(sprites[p.k], p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function frame(t) {
+    var dt = Math.min(.05, (t - last) / 1000);
+    last = t;
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      p.y -= p.vy * dt;
+      p.x += Math.sin(t / 1000 * .5 + p.ph) * p.drift * dt;
+      if (p.y < -30) parts[i] = make(false);
+    }
+    draw(t);
+    raf = requestAnimationFrame(frame);
+  }
+
+  function start() {
+    cancelAnimationFrame(raf);
+    if (mq.matches || document.hidden) { draw(performance.now()); return; }
+    last = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { resize(); start(); }, 150);
+  });
+  document.addEventListener('visibilitychange', start);
+  if (mq.addEventListener) mq.addEventListener('change', start);
+  else if (mq.addListener) mq.addListener(start);
+
+  resize();
+  start();
+})();
+</script>
+</body>
+</html>
